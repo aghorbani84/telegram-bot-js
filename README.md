@@ -1,41 +1,89 @@
-# Telegram Bot — JavaScript Worker
+<h1 align="center">telegram-bot-js</h1>
 
-A small JavaScript webhook handler that receives Telegram text-message updates and forwards the message to a configured administrator chat.
+<p align="center">
+  <em>A tiny Cloudflare Worker that forwards every text message your Telegram bot receives to an admin chat.</em>
+</p>
 
-## How it works
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License: Apache 2.0" /></a>
+  <img src="https://img.shields.io/badge/JavaScript-F7DF1E?logo=javascript&logoColor=black" alt="JavaScript" />
+  <img src="https://img.shields.io/badge/Cloudflare_Workers-F38020?logo=cloudflare&logoColor=white" alt="Cloudflare Workers" />
+  <img src="https://img.shields.io/badge/dependencies-0-0D9488" alt="Zero dependencies" />
+</p>
 
-The worker's `fetch()` handler:
+---
 
-1. Accepts `POST /` requests containing a Telegram update payload.
-2. Checks for a text message.
-3. Sends the sender's username, Telegram user ID, and message text to the configured admin chat using the Telegram Bot API.
-4. Returns an HTTP status describing the outcome.
+## Overview
 
-Other paths and methods receive a `404` response.
+`index.js` is a single Cloudflare Worker (ES module syntax) that acts as a Telegram bot webhook. When a user sends the bot a text message, the Worker relays it to a chat you choose — handy as a simple "contact the admin" bot. No libraries, no database.
 
-## Configuration
+## Features
 
-Configure these values as deployment environment variables/secrets:
+- Receives Telegram webhook updates via `POST /`
+- Forwards text messages to `ADMIN_CHAT_ID` as `📩 New message from @username (id): …`
+- Falls back to `Anonymous` when the sender has no username
+- Clear HTTP responses: `200` forwarded, `400` no text message, `404` other routes, `500` Telegram/API errors
+- Zero dependencies — uses the built-in `fetch`
 
-| Variable | Purpose |
-| --- | --- |
+## Tech Stack
+
+- JavaScript (ES modules)
+- [Cloudflare Workers](https://developers.cloudflare.com/workers/)
+- [Telegram Bot API](https://core.telegram.org/bots/api) (`sendMessage`, webhooks)
+
+## Getting Started
+
+### Prerequisites
+
+- A Cloudflare account and [Wrangler](https://developers.cloudflare.com/workers/wrangler/)
+- A bot token from [@BotFather](https://t.me/BotFather)
+- The chat ID that should receive messages
+
+### Deploy
+
+The repo has no `wrangler.toml`, so pass the entry file and name on the command line:
+
+```bash
+git clone https://github.com/aghorbani84/telegram-bot-js.git
+cd telegram-bot-js
+
+npx wrangler deploy index.js --name telegram-bot-js --compatibility-date 2024-01-01
+npx wrangler secret put BOT_TOKEN --name telegram-bot-js
+npx wrangler secret put ADMIN_CHAT_ID --name telegram-bot-js
+```
+
+### Register the webhook
+
+Point Telegram at your Worker URL:
+
+```bash
+curl "https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=https://telegram-bot-js.<your-subdomain>.workers.dev/"
+```
+
+Send your bot a message — it should appear in the admin chat.
+
+### Environment variables
+
+| Name | Description |
+|---|---|
 | `BOT_TOKEN` | Telegram bot token |
-| `ADMIN_CHAT_ID` | Destination chat ID for forwarded messages |
+| `ADMIN_CHAT_ID` | Chat ID that receives forwarded messages |
 
-Never commit real bot tokens or credentials. If a token is exposed, revoke it through BotFather and replace the deployed secret.
+> [!NOTE]
+> The Worker does not verify Telegram's `X-Telegram-Bot-Api-Secret-Token` header, so anyone who knows the Worker URL can post to it. Consider adding a `secret_token` when calling `setWebhook` and checking it in the Worker.
 
-## Deploy and connect
+## Project Structure
 
-The source uses the module-worker `fetch(request, env)` interface. Deploy it to a JavaScript edge/runtime platform that supports this interface, then configure the Telegram bot webhook to point to the deployed HTTPS endpoint.
+```
+.
+├── index.js   # Cloudflare Worker (webhook handler)
+└── LICENSE    # Apache-2.0
+```
 
-The webhook URL and deployment commands depend on the hosting provider and are intentionally not assumed here.
+## License
 
-## Security notes
+Licensed under the [Apache License 2.0](LICENSE).
 
-- Restrict who can invoke the webhook where the hosting platform allows it; the current source does not validate a Telegram webhook secret.
-- Treat forwarded message contents and user identifiers as personal data.
-- Add input-size limits, structured logging, and stronger error handling before production use.
+## Author
 
-## Development
-
-The repository currently contains a single `index.js` worker entry point. Test changes with representative Telegram update payloads before deployment.
+**Abolfazl Ghorbani** — [@aghorbani84](https://github.com/aghorbani84)
